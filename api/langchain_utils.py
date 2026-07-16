@@ -33,8 +33,22 @@ contextualize_q_prompt = ChatPromptTemplate.from_messages([
     ("human", "{input}"),
 ])
 
+
+
+document_prompt = ChatPromptTemplate.from_template(
+    "Source: {source}\nContent: {page_content}"
+)
+
 qa_prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a helpful AI assistant. Use the following context to answer the user's question."),
+    ("system",
+     "You are an assistant that answers questions strictly using the provided context. "
+     "Each piece of context is labeled with its Source filename. "
+     "Only use information found in the context below to answer the user's question. "
+     "If the answer is not contained in the context, say clearly: "
+     "\"I don't have enough information in the uploaded documents to answer that.\" "
+     "Do not use any outside knowledge, even if you know the answer. "
+     "At the end of your answer, cite which source file(s) you used, like: (Source: filename.pdf)"
+    ),
     ("system", "Context: {context}"),
     MessagesPlaceholder(variable_name="chat_history"),
     ("human", "{input}")
@@ -44,6 +58,10 @@ qa_prompt = ChatPromptTemplate.from_messages([
 def get_rag_chain(model="gemini-3.1-flash-lite"):
     llm = get_llm(model)
     history_aware_retriever = create_history_aware_retriever(llm, retriever, contextualize_q_prompt)
-    question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+    question_answer_chain = create_stuff_documents_chain(
+        llm,
+        qa_prompt,
+        document_prompt=document_prompt
+    )
     rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
     return rag_chain

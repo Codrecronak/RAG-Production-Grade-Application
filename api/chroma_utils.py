@@ -43,13 +43,17 @@ def load_and_split_document(file_path: str) -> List[Document]:
 def index_document_to_chroma(file_path: str, file_id: int) -> bool:
     try:
         splits = load_and_split_document(file_path)
-        
-        # Add metadata to each split
+
+        # Clean filename for citation purposes (strip temp_ prefix and path)
+        clean_filename = os.path.basename(file_path)
+        if clean_filename.startswith("temp_"):
+            clean_filename = clean_filename[len("temp_"):]
+
         for split in splits:
             split.metadata['file_id'] = file_id
-        
+            split.metadata['source'] = clean_filename
+
         vectorstore.add_documents(splits)
-        # vectorstore.persist()
         return True
     except Exception as e:
         print(f"Error indexing document: {e}")
