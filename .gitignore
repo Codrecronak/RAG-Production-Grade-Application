@@ -1,0 +1,32 @@
+# Secrets
+.env
+
+# Virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Vector database
+chroma_db/
+
+# App logs
+app.log
+*.log
+
+# SQLite database
+rag_app.db
+
+# Temp files created during upload
+temp_*
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

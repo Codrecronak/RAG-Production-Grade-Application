@@ -1,0 +1,11 @@
+langchain
+langchain-openai
+langchain-google-genai
+langchain-core
+langchain_community
+docx2txt
+python-docx
+pypdf
+langchain_chroma
+python-multipart
+streamlit
