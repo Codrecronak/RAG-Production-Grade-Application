@@ -9,3 +9,4 @@ pypdf
 langchain_chroma
 python-multipart
 streamlit
+fastapi
