@@ -11,6 +11,14 @@ import uuid
 import logging
 logging.basicConfig(filename='app.log', level=logging.INFO)
 app = FastAPI()
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/chat", response_model=QueryResponse)
 def chat(query_input: QueryInput):
@@ -81,3 +89,8 @@ def delete_document(request: DeleteFileRequest):
             return {"error": f"Deleted from Chroma but failed to delete document with file_id {request.file_id} from the database."}
     else:
         return {"error": f"Failed to delete document with file_id {request.file_id} from Chroma."}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
