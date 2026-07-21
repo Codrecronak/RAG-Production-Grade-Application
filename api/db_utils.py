@@ -41,16 +41,38 @@ def get_chat_history(session_id):
 
 def create_document_store():
     conn = get_db_connection()
-    conn.execute('''CREATE TABLE IF NOT EXISTS document_store
-                    (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                     filename TEXT,
-                     upload_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    cursor = conn.cursor()
+    
+    # Check if the table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='document_store'")
+    table_exists = cursor.fetchone()
+    
+    if not table_exists:
+        # Create table with session_id column
+        conn.execute('''CREATE TABLE IF NOT EXISTS document_store
+                        (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                         filename TEXT,
+                         session_id TEXT,
+                         upload_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    else:
+        # Check if session_id column exists
+        cursor.execute("PRAGMA table_info(document_store)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        if 'session_id' not in columns:
+            # Add session_id column if it doesn't exist
+            try:
+                conn.execute('ALTER TABLE document_store ADD COLUMN session_id TEXT')
+            except Exception as e:
+                print(f"Column session_id might already exist: {e}")
+    
+    conn.commit()
     conn.close()
 
-def insert_document_record(filename):
+def insert_document_record(filename, session_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('INSERT INTO document_store (filename) VALUES (?)', (filename,))
+    cursor.execute('INSERT INTO document_store (filename, session_id) VALUES (?, ?)', (filename, session_id))
     file_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -62,6 +84,20 @@ def delete_document_record(file_id):
     conn.commit()
     conn.close()
     return True
+
+def delete_documents_by_session(session_id):
+    """Delete all documents associated with a specific session"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id FROM document_store WHERE session_id = ?', (session_id,))
+    docs = cursor.fetchall()
+    
+    if docs:
+        conn.execute('DELETE FROM document_store WHERE session_id = ?', (session_id,))
+        conn.commit()
+    
+    conn.close()
+    return [doc['id'] for doc in docs] if docs else []
 
 def get_all_documents():
     conn = get_db_connection()

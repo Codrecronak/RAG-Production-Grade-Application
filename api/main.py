@@ -4,7 +4,7 @@ load_dotenv()
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from .pydantic_models import QueryInput, QueryResponse, DocumentInfo, DeleteFileRequest
 from .langchain_utils import get_rag_chain
-from .db_utils import insert_application_logs, get_chat_history, get_all_documents, insert_document_record, delete_document_record
+from .db_utils import insert_application_logs, get_chat_history, get_all_documents, insert_document_record, delete_document_record, delete_documents_by_session, get_db_connection
 from .chroma_utils import index_document_to_chroma, delete_doc_from_chroma
 import os
 import uuid
@@ -45,7 +45,7 @@ import os
 import shutil
 
 @app.post("/upload-doc")
-def upload_and_index_document(file: UploadFile = File(...)):
+def upload_and_index_document(file: UploadFile = File(...), session_id: str = None):
     allowed_extensions = ['.pdf', '.docx', '.html']
     file_extension = os.path.splitext(file.filename)[1].lower()
     
@@ -59,7 +59,7 @@ def upload_and_index_document(file: UploadFile = File(...)):
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        file_id = insert_document_record(file.filename)
+        file_id = insert_document_record(file.filename, session_id)
         success = index_document_to_chroma(temp_file_path, file_id)
         
         if success:
@@ -89,6 +89,49 @@ def delete_document(request: DeleteFileRequest):
             return {"error": f"Deleted from Chroma but failed to delete document with file_id {request.file_id} from the database."}
     else:
         return {"error": f"Failed to delete document with file_id {request.file_id} from Chroma."}
+
+@app.post("/delete-session-docs")
+def delete_session_documents(session_id: str):
+    """Delete all documents associated with a specific session"""
+    file_ids = delete_documents_by_session(session_id)
+    
+    if file_ids:
+        for file_id in file_ids:
+            delete_doc_from_chroma(file_id)
+        return {"message": f"Successfully deleted {len(file_ids)} documents for session {session_id}.", "deleted_files": file_ids}
+    else:
+        return {"message": f"No documents found for session {session_id}."}
+
+@app.post("/clear-all-docs")
+def clear_all_documents():
+    """Clear all documents from the vector store and database (for new browser sessions)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT id FROM document_store')
+        all_docs = cursor.fetchall()
+        conn.close()
+        
+        file_ids = [doc['id'] for doc in all_docs]
+        
+        if file_ids:
+            # Delete from Chroma
+            for file_id in file_ids:
+                delete_doc_from_chroma(file_id)
+            
+            # Delete from database
+            conn = get_db_connection()
+            conn.execute('DELETE FROM document_store')
+            conn.commit()
+            conn.close()
+            
+            logging.info(f"Cleared all {len(file_ids)} documents for new browser session")
+            return {"message": f"Successfully cleared {len(file_ids)} documents.", "deleted_files": file_ids}
+        else:
+            return {"message": "No documents to clear."}
+    except Exception as e:
+        logging.error(f"Error clearing all documents: {str(e)}")
+        return {"error": f"Failed to clear documents: {str(e)}"}
 
 if __name__ == "__main__":
     import uvicorn
